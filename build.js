@@ -12,10 +12,13 @@ const calcJs = readFileSync(resolve(srcDir, 'calc.js'), 'utf8');
 // Strip export keywords so the functions become globals
 const inlineJs = calcJs.replace(/^export\s+/gm, '');
 
-// Replace the <script type="module"> block (including the import line) with an inline script
+// Remove the import line from the module script, prepend inlined calc.js, drop type="module"
 const result = html.replace(
-  /<script type="module">[\s\S]*?<\/script>/,
-  `<script>\n${inlineJs}\n</script>`
+  /<script type="module">([\s\S]*?)<\/script>/,
+  (_, appJs) => {
+    const appJsNoImport = appJs.replace(/^\s*import\s+.*?from\s+['"].*?['"];?\s*\n/m, '');
+    return `<script>\n${inlineJs}\n${appJsNoImport}</script>`;
+  }
 );
 
 mkdirSync(distDir, { recursive: true });
