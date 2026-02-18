@@ -6,7 +6,7 @@ Always use **pnpm**. Never npm or yarn.
 ## Commands
 - `pnpm dev` — Vite dev server at http://localhost:5173, HMR, use this for all visual testing
 - `pnpm test` — node:test, runs directly against src/calc.js (no server needed)
-- `pnpm build` — custom build.js → dist/index.html (single inlined file, deployed to S3)
+- `pnpm build` — custom build.js → dist/index.html (single inlined file, deployed to GitHub Pages)
 
 ## Structure
 - `src/calc.js` — pure calculation logic, no DOM, fully exported and unit-tested
@@ -19,5 +19,5 @@ Always use **pnpm**. Never npm or yarn.
 - All state lives in `localStorage` under key `plateCalc`; `loadState()` / `saveState()` handle it
 - `state.barWeight` and `state.maxWeight` drive the slider min/max; bar is in Settings, not the main UI
 - Warmup sets always render — no percentage-proximity filter
-- The build intentionally produces a **single HTML file** with no external dependencies (S3 deploy)
+- The build produces a single HTML file (all JS/CSS inlined) plus two icon PNGs (deployed to GitHub Pages)
 - Tests use `node:test` (built-in), no test framework to install
