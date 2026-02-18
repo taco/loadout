@@ -25,7 +25,7 @@ jobs:
         run: pnpm run build
 
       - name: Deploy to S3
-        run: aws s3 cp dist/index.html s3://${{ secrets.S3_BUCKET }}/index.html
+        run: aws s3 sync dist/ s3://${{ secrets.S3_BUCKET }}/ --delete
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
