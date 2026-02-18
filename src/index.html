@@ -1,0 +1,858 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="theme-color" content="#121212" />
+    <title>Loadout</title>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --bg: #121212;
+        --card: #1e1e1e;
+        --card-border: #2a2a2a;
+        --text: #e0e0e0;
+        --text-dim: #888;
+        --accent: #4fc3f7;
+        --accent-dim: #2a6f8a;
+        --error: #ef5350;
+        --green: #66bb6a;
+      }
+
+      html {
+        font-size: 16px;
+      }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100dvh;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 16px;
+        border-bottom: 1px solid var(--card-border);
+      }
+      .header-title {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      header h1 {
+        font-size: 1.25rem;
+        font-weight: 700;
+      }
+      .bar-subtitle {
+        font-size: 0.75rem;
+        color: var(--text-dim);
+      }
+      header button {
+        background: none;
+        border: none;
+        color: var(--text-dim);
+        font-size: 1.5rem;
+        cursor: pointer;
+        padding: 8px;
+        min-width: 48px;
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .inputs {
+        padding: 12px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .input-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .input-row label {
+        font-size: 0.875rem;
+        color: var(--text-dim);
+        min-width: 52px;
+      }
+      .input-row input[type="text"] {
+        flex: 1;
+        background: var(--card);
+        border: 1px solid var(--card-border);
+        border-radius: 8px;
+        color: var(--text);
+        font-size: 1.25rem;
+        padding: 12px 16px;
+        min-height: 36px;
+        outline: none;
+        transition: border-color 0.15s;
+      }
+      .input-row input[type="text"]:focus {
+        border-color: var(--accent);
+      }
+      .input-row .unit {
+        font-size: 0.875rem;
+        color: var(--text-dim);
+        min-width: 20px;
+      }
+
+      #results {
+        padding: 0 20px 80px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .error-msg {
+        color: var(--error);
+        font-size: 0.9rem;
+        padding: 12px 0;
+        text-align: center;
+      }
+
+      .set-card {
+        background: var(--card);
+        border: 1px solid var(--card-border);
+        border-radius: 12px;
+        padding: 12px;
+      }
+      .set-card .set-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 8px;
+      }
+      .set-card .set-label {
+        font-size: 0.8rem;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .set-card .set-weight {
+        font-size: 1.25rem;
+        font-weight: 700;
+      }
+      .set-card .set-weight .adjusted {
+        font-size: 0.75rem;
+        color: var(--text-dim);
+        font-weight: 400;
+      }
+      .set-card .per-side {
+        font-size: 0.85rem;
+        color: var(--text-dim);
+        margin-bottom: 4px;
+      }
+
+      .plate-visual {
+        display: flex;
+        align-items: center;
+        gap: 0;
+        margin: 6px 0;
+        overflow-x: auto;
+      }
+      .bar-end {
+        width: 40px;
+        height: 10px;
+        background: #666;
+        border-radius: 3px 0 0 3px;
+        flex-shrink: 0;
+      }
+      .collar {
+        width: 6px;
+        height: 26px;
+        background: #888;
+        border-radius: 0;
+        flex-shrink: 0;
+      }
+      .plate {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: #fff;
+        border-radius: 3px;
+        flex-shrink: 0;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+      }
+      .plate-50 {
+        background: #388e3c;
+        width: 32px;
+        height: 62px;
+      }
+      .plate-45 {
+        background: #388e3c;
+        width: 32px;
+        height: 62px;
+      }
+      .plate-25 {
+        background: #d32f2f;
+        width: 28px;
+        height: 54px;
+      }
+      .plate-10 {
+        background: #1976d2;
+        width: 24px;
+        height: 44px;
+      }
+      .plate-5 {
+        background: #f9a825;
+        width: 22px;
+        height: 38px;
+        color: #333;
+        text-shadow: none;
+      }
+      .plate-2\.5 {
+        background: #7b1fa2;
+        width: 24px;
+        height: 32px;
+        font-size: 0.6rem;
+      }
+      .plate-1\.25 {
+        background: #757575;
+        width: 22px;
+        height: 26px;
+        font-size: 0.55rem;
+      }
+
+      .delta {
+        font-size: 0.85rem;
+        margin-top: 4px;
+        padding: 4px 8px;
+        border-radius: 6px;
+        background: rgba(79, 195, 247, 0.08);
+        color: var(--accent);
+      }
+      .delta.first {
+        color: var(--text-dim);
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      /* Settings bottom sheet */
+      .backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s;
+        z-index: 10;
+      }
+      .backdrop.open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .bottom-sheet {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: var(--card);
+        border-radius: 16px 16px 0 0;
+        padding: 20px 20px 40px;
+        transform: translateY(100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 11;
+        max-height: 80dvh;
+        overflow-y: auto;
+      }
+      .bottom-sheet.open {
+        transform: translateY(0);
+      }
+      .sheet-handle {
+        width: 36px;
+        height: 4px;
+        background: #444;
+        border-radius: 2px;
+        margin: 0 auto 20px;
+      }
+
+      .sheet-section {
+        margin-bottom: 24px;
+      }
+      .sheet-section h3 {
+        font-size: 0.8rem;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 12px;
+      }
+
+      .setting-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .setting-row input[type="text"] {
+        width: 80px;
+        background: var(--bg);
+        border: 1px solid var(--card-border);
+        border-radius: 8px;
+        color: var(--text);
+        font-size: 1rem;
+        padding: 8px 12px;
+        outline: none;
+        text-align: center;
+        transition: border-color 0.15s;
+      }
+      .setting-row input[type="text"]:focus {
+        border-color: var(--accent);
+      }
+      .setting-row .unit {
+        font-size: 0.875rem;
+        color: var(--text-dim);
+      }
+
+      .warmup-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      .warmup-chip {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        background: var(--bg);
+        border: 1px solid var(--card-border);
+        border-radius: 20px;
+        padding: 8px 12px;
+        font-size: 0.9rem;
+        color: var(--text);
+        min-height: 40px;
+      }
+      .warmup-chip input {
+        width: 36px;
+        background: none;
+        border: none;
+        color: var(--text);
+        font-size: 0.9rem;
+        text-align: center;
+        outline: none;
+      }
+      .warmup-chip .remove-warmup {
+        background: none;
+        border: none;
+        color: var(--text-dim);
+        cursor: pointer;
+        font-size: 1rem;
+        padding: 0 2px;
+        min-width: 24px;
+        min-height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .add-warmup {
+        background: none;
+        border: 1px dashed var(--card-border);
+        border-radius: 20px;
+        color: var(--accent);
+        font-size: 0.9rem;
+        padding: 8px 16px;
+        cursor: pointer;
+        min-height: 40px;
+      }
+
+      .plate-toggles {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+      .plate-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        background: var(--bg);
+        border: 1px solid var(--card-border);
+        border-radius: 8px;
+        padding: 12px;
+        cursor: pointer;
+        min-height: 48px;
+        font-size: 0.95rem;
+        color: var(--text-dim);
+        transition:
+          border-color 0.15s,
+          color 0.15s;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      .plate-toggle.active {
+        border-color: var(--accent);
+        color: var(--text);
+      }
+      .plate-toggle .check {
+        width: 18px;
+        height: 18px;
+        border-radius: 4px;
+        border: 2px solid var(--card-border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.7rem;
+        transition:
+          background 0.15s,
+          border-color 0.15s;
+      }
+      .plate-toggle.active .check {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #000;
+      }
+
+      input[type="range"] {
+        -webkit-appearance: none;
+        appearance: none;
+        flex: 1;
+        height: 4px;
+        background: var(--card-border);
+        border-radius: 2px;
+        outline: none;
+        cursor: pointer;
+        padding: 0;
+        min-height: unset;
+        border: none;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--accent);
+        cursor: pointer;
+        border: 2px solid var(--bg);
+      }
+      input[type="range"]::-moz-range-thumb {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: var(--accent);
+        cursor: pointer;
+        border: 2px solid var(--bg);
+        box-sizing: border-box;
+      }
+      .target-override {
+        flex: 0 0 64px !important;
+        width: 64px !important;
+        text-align: center;
+        font-size: 1rem !important;
+        padding: 8px 6px !important;
+        min-height: 36px !important;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="header-title">
+        <h1>Loadout</h1>
+        <span class="bar-subtitle" id="barSubtitle">45 lb bar</span>
+      </div>
+      <button id="settingsBtn" aria-label="Settings">&#9881;</button>
+    </header>
+
+    <div class="inputs">
+      <div class="input-row">
+        <label for="targetSlider">Target</label>
+        <input type="range" id="targetSlider" min="45" max="250" step="2.5" value="225" />
+        <input type="text" id="targetInput" inputmode="decimal" class="target-override" placeholder="225" />
+        <span class="unit">lb</span>
+      </div>
+    </div>
+
+    <div id="results"></div>
+
+    <div class="backdrop" id="backdrop"></div>
+    <div class="bottom-sheet" id="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-section">
+        <h3>Bar Weight</h3>
+        <div class="setting-row">
+          <input type="text" id="barSetting" inputmode="decimal" />
+          <span class="unit">lb</span>
+        </div>
+      </div>
+      <div class="sheet-section">
+        <h3>Max Weight</h3>
+        <div class="setting-row">
+          <input type="text" id="maxWeightSetting" inputmode="decimal" />
+          <span class="unit">lb</span>
+        </div>
+      </div>
+      <div class="sheet-section">
+        <h3>Warmup Sets (%)</h3>
+        <div class="warmup-list" id="warmupList"></div>
+      </div>
+      <div class="sheet-section">
+        <h3>Available Plates</h3>
+        <div class="plate-toggles" id="plateToggles"></div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { calculate, formatWeight } from "./calc.js";
+
+      const ALL_PLATES = [50, 45, 25, 10, 5, 2.5, 1.25];
+
+      const defaults = {
+        barWeight: 45,
+        warmupPcts: [50, 75],
+        lastTarget: "",
+        availablePlates: [1.25, 2.5, 5, 10, 25, 45],
+        maxWeight: 250,
+      };
+
+      function loadState() {
+        try {
+          const s = JSON.parse(localStorage.getItem("plateCalc"));
+          if (s && typeof s === "object") {
+            return {
+              barWeight: s.barWeight ?? defaults.barWeight,
+              warmupPcts: Array.isArray(s.warmupPcts)
+                ? s.warmupPcts
+                : [...defaults.warmupPcts],
+              lastTarget: s.lastTarget ?? defaults.lastTarget,
+              availablePlates: Array.isArray(s.availablePlates)
+                ? s.availablePlates
+                : [...defaults.availablePlates],
+              maxWeight: s.maxWeight ?? defaults.maxWeight,
+            };
+          }
+        } catch {}
+        return {
+          ...defaults,
+          warmupPcts: [...defaults.warmupPcts],
+          availablePlates: [...defaults.availablePlates],
+        };
+      }
+
+      function saveState(state) {
+        localStorage.setItem("plateCalc", JSON.stringify(state));
+      }
+
+      let state = loadState();
+
+      // --- Rendering ---
+
+      function plateClass(weight) {
+        return "plate plate-" + weight;
+      }
+
+      function renderPlateVisual(plates) {
+        let html = '<div class="plate-visual">';
+        html += '<div class="bar-end"></div><div class="collar"></div>';
+        for (const p of plates) {
+          html +=
+            '<div class="' + plateClass(p) + '">' + formatWeight(p) + "</div>";
+        }
+        html += "</div>";
+        return html;
+      }
+
+      function renderDelta(delta, type) {
+        if (delta.length === 0 && type === "load")
+          return '<div class="delta first">Bar only</div>';
+        if (delta.length === 0) return '<div class="delta">No change</div>';
+        const label = type === "load" ? "Load" : "Add";
+        const plateStr = delta.map(formatWeight).join(", ");
+        return (
+          '<div class="delta ' +
+          (type === "load" ? "first" : "") +
+          '">&rarr; ' +
+          label +
+          ": " +
+          plateStr +
+          "</div>"
+        );
+      }
+
+      function renderResults(result) {
+        const el = document.getElementById("results");
+        if (result.error) {
+          el.innerHTML = '<div class="error-msg">' + result.error + "</div>";
+          return;
+        }
+        if (!result.sets || result.sets.length === 0) {
+          el.innerHTML = "";
+          return;
+        }
+
+        let html = "";
+        result.sets.forEach((set, i) => {
+          const perSide = set.plates.reduce((s, p) => s + p, 0);
+          const adjusted =
+            set.actual !== set.target
+              ? ' <span class="adjusted">(target ' + set.target + ")</span>"
+              : "";
+          html += '<div class="set-card">';
+          html += '<div class="set-header">';
+          html +=
+            '<span class="set-label">Set ' +
+            (i + 1) +
+            ": " +
+            set.label +
+            "</span>";
+          html +=
+            '<span class="set-weight">' +
+            set.actual +
+            " lb" +
+            adjusted +
+            "</span>";
+          html += "</div>";
+          html +=
+            '<div class="per-side">Each side: ' +
+            (set.plates.length
+              ? set.plates.map(formatWeight).join(", ")
+              : "none") +
+            " (" +
+            formatWeight(perSide) +
+            " lb)</div>";
+          html += renderPlateVisual(set.plates);
+          html += renderDelta(set.delta, set.deltaType);
+          html += "</div>";
+        });
+        el.innerHTML = html;
+      }
+
+      // --- Settings ---
+
+      function updateBarSubtitle() {
+        document.getElementById("barSubtitle").textContent =
+          formatWeight(state.barWeight) + " lb bar";
+      }
+
+      function renderWarmups() {
+        const el = document.getElementById("warmupList");
+        let html = "";
+        state.warmupPcts.forEach((pct, i) => {
+          html += '<div class="warmup-chip">';
+          html +=
+            '<input type="text" inputmode="numeric" value="' +
+            pct +
+            '" data-warmup-idx="' +
+            i +
+            '" aria-label="Warmup percentage">';
+          html += "<span>%</span>";
+          html +=
+            '<button class="remove-warmup" data-remove-idx="' +
+            i +
+            '" aria-label="Remove">&times;</button>';
+          html += "</div>";
+        });
+        html += '<button class="add-warmup" id="addWarmupBtn">+ Add</button>';
+        el.innerHTML = html;
+
+        el.querySelectorAll("input[data-warmup-idx]").forEach((inp) => {
+          inp.addEventListener("change", (e) => {
+            const idx = parseInt(e.target.dataset.warmupIdx);
+            const val = parseInt(e.target.value);
+            if (val > 0 && val < 100) {
+              state.warmupPcts[idx] = val;
+              saveState(state);
+              recalc();
+            }
+          });
+        });
+
+        el.querySelectorAll(".remove-warmup").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            const idx = parseInt(e.target.dataset.removeIdx);
+            state.warmupPcts.splice(idx, 1);
+            saveState(state);
+            renderWarmups();
+            recalc();
+          });
+        });
+
+        document
+          .getElementById("addWarmupBtn")
+          .addEventListener("click", () => {
+            const last = state.warmupPcts.length
+              ? Math.max(...state.warmupPcts)
+              : 0;
+            const next = Math.min(last + 25, 95);
+            if (next > 0 && !state.warmupPcts.includes(next)) {
+              state.warmupPcts.push(next);
+            } else {
+              state.warmupPcts.push(50);
+            }
+            saveState(state);
+            renderWarmups();
+            recalc();
+          });
+      }
+
+      function renderPlateToggles() {
+        const el = document.getElementById("plateToggles");
+        let html = "";
+        ALL_PLATES.forEach((p) => {
+          const active = state.availablePlates.includes(p);
+          html +=
+            '<div class="plate-toggle' +
+            (active ? " active" : "") +
+            '" data-plate="' +
+            p +
+            '">';
+          html +=
+            '<span class="check">' + (active ? "&#10003;" : "") + "</span>";
+          html += "<span>" + formatWeight(p) + "</span>";
+          html += "</div>";
+        });
+        el.innerHTML = html;
+
+        el.querySelectorAll(".plate-toggle").forEach((tog) => {
+          tog.addEventListener("click", () => {
+            const p = parseFloat(tog.dataset.plate);
+            const idx = state.availablePlates.indexOf(p);
+            if (idx >= 0) {
+              state.availablePlates.splice(idx, 1);
+            } else {
+              state.availablePlates.push(p);
+            }
+            saveState(state);
+            renderPlateToggles();
+            recalc();
+          });
+        });
+      }
+
+      function openSheet() {
+        document.getElementById("backdrop").classList.add("open");
+        document.getElementById("sheet").classList.add("open");
+      }
+
+      function closeSheet() {
+        document.getElementById("backdrop").classList.remove("open");
+        document.getElementById("sheet").classList.remove("open");
+      }
+
+      // --- Main wiring ---
+
+      let debounceTimer;
+
+      function recalc() {
+        const bar = state.barWeight;
+        const target = parseFloat(targetInputEl.value);
+
+        if (isNaN(bar) || bar <= 0) {
+          document.getElementById("results").innerHTML = "";
+          return;
+        }
+        if (isNaN(target) || target <= 0) {
+          document.getElementById("results").innerHTML = "";
+          return;
+        }
+
+        state.lastTarget = target;
+        saveState(state);
+
+        const result = calculate(
+          bar,
+          target,
+          state.warmupPcts,
+          state.availablePlates,
+        );
+        renderResults(result);
+      }
+
+      function debouncedRecalc() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(recalc, 200);
+      }
+
+      const sliderEl = document.getElementById("targetSlider");
+      const targetInputEl = document.getElementById("targetInput");
+      const barSettingEl = document.getElementById("barSetting");
+      const maxWeightEl = document.getElementById("maxWeightSetting");
+
+      sliderEl.addEventListener("input", () => {
+        targetInputEl.value = sliderEl.value;
+        debouncedRecalc();
+      });
+
+      targetInputEl.addEventListener("input", () => {
+        const val = parseFloat(targetInputEl.value);
+        if (!isNaN(val) && val > 0) {
+          const snapped = Math.round(val / 2.5) * 2.5;
+          sliderEl.value = Math.max(
+            parseFloat(sliderEl.min),
+            Math.min(parseFloat(sliderEl.max), snapped),
+          );
+        }
+        debouncedRecalc();
+      });
+
+      barSettingEl.addEventListener("input", () => {
+        const bar = parseFloat(barSettingEl.value);
+        if (!isNaN(bar) && bar > 0) {
+          state.barWeight = bar;
+          saveState(state);
+          sliderEl.min = bar;
+          const currentTarget = parseFloat(targetInputEl.value);
+          if (!isNaN(currentTarget) && currentTarget < bar) {
+            sliderEl.value = bar;
+            targetInputEl.value = bar;
+          }
+          updateBarSubtitle();
+          debouncedRecalc();
+        }
+      });
+
+      maxWeightEl.addEventListener("input", () => {
+        const max = parseFloat(maxWeightEl.value);
+        if (!isNaN(max) && max > 0) {
+          state.maxWeight = max;
+          saveState(state);
+          sliderEl.max = max;
+          const currentVal = parseFloat(sliderEl.value);
+          if (currentVal > max) {
+            sliderEl.value = max;
+            targetInputEl.value = max;
+            debouncedRecalc();
+          }
+        }
+      });
+
+      document
+        .getElementById("settingsBtn")
+        .addEventListener("click", openSheet);
+      document.getElementById("backdrop").addEventListener("click", closeSheet);
+
+      // Init
+      barSettingEl.value = state.barWeight;
+      maxWeightEl.value = state.maxWeight;
+      sliderEl.min = state.barWeight;
+      sliderEl.max = state.maxWeight;
+      updateBarSubtitle();
+      if (state.lastTarget) {
+        sliderEl.value = state.lastTarget;
+        targetInputEl.value = state.lastTarget;
+      }
+      renderWarmups();
+      renderPlateToggles();
+      if (state.lastTarget) recalc();
+    </script>
+  </body>
+</html>
