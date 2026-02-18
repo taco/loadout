@@ -469,11 +469,11 @@
         box-sizing: border-box;
       }
       .target-override {
-        flex: 0 0 80px !important;
-        width: 80px !important;
+        flex: 1 !important;
         text-align: center;
-        font-size: 1.15rem !important;
-        padding: 8px 6px !important;
+        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        font-size: 1.25rem !important;
+        padding: 10px 12px !important;
         min-height: 48px !important;
       }
     </style>
@@ -489,15 +489,7 @@
 
     <div class="inputs">
       <div class="input-row">
-        <label for="targetSlider">Target</label>
-        <input
-          type="range"
-          id="targetSlider"
-          min="45"
-          max="250"
-          step="2.5"
-          value="225"
-        />
+        <label for="targetInput">Target</label>
         <input
           type="text"
           id="targetInput"
@@ -506,6 +498,16 @@
           placeholder="225"
         />
         <span class="unit">lb</span>
+      </div>
+      <div class="input-row">
+        <input
+          type="range"
+          id="targetSlider"
+          min="45"
+          max="250"
+          step="2.5"
+          value="225"
+        />
       </div>
     </div>
 
@@ -598,10 +600,22 @@
         return html;
       }
 
-      function renderDelta(delta, type) {
+      function renderDelta(delta, type, removeDelta) {
         if (delta.length === 0 && type === "load")
           return '<div class="delta first">Bar only</div>';
-        if (delta.length === 0) return '<div class="delta">No change</div>';
+        if (delta.length === 0 && (!removeDelta || removeDelta.length === 0))
+          return '<div class="delta">No change</div>';
+        if (type === "swap") {
+          const removeStr = (removeDelta || []).map(formatWeight).join(", ");
+          const addStr = delta.map(formatWeight).join(", ");
+          return (
+            '<div class="delta">&minus; ' +
+            removeStr +
+            " &rarr; + " +
+            addStr +
+            "</div>"
+          );
+        }
         const label = type === "load" ? "Load" : "Add";
         const plateStr = delta.map(formatWeight).join(", ");
         return (
@@ -657,7 +671,7 @@
             formatWeight(perSide) +
             " lb)</div>";
           html += renderPlateVisual(set.plates);
-          html += renderDelta(set.delta, set.deltaType);
+          html += renderDelta(set.delta, set.deltaType, set.removeDelta);
           html += "</div>";
         });
         el.innerHTML = html;
@@ -809,14 +823,29 @@
         debounceTimer = setTimeout(recalc, 200);
       }
 
+      function formatTarget(v) {
+        return parseFloat(v).toFixed(1);
+      }
+
       const sliderEl = document.getElementById("targetSlider");
       const targetInputEl = document.getElementById("targetInput");
       const barSettingEl = document.getElementById("barSetting");
       const maxWeightEl = document.getElementById("maxWeightSetting");
 
       sliderEl.addEventListener("input", () => {
-        targetInputEl.value = sliderEl.value;
+        targetInputEl.value = formatTarget(sliderEl.value);
         debouncedRecalc();
+      });
+
+      targetInputEl.addEventListener("focus", () => {
+        targetInputEl.select();
+      });
+
+      targetInputEl.addEventListener("blur", () => {
+        const val = parseFloat(targetInputEl.value);
+        if (!isNaN(val) && val > 0) {
+          targetInputEl.value = formatTarget(val);
+        }
       });
 
       targetInputEl.addEventListener("input", () => {
@@ -840,7 +869,7 @@
           const currentTarget = parseFloat(targetInputEl.value);
           if (!isNaN(currentTarget) && currentTarget < bar) {
             sliderEl.value = bar;
-            targetInputEl.value = bar;
+            targetInputEl.value = formatTarget(bar);
           }
           updateBarSubtitle();
           debouncedRecalc();
@@ -856,7 +885,7 @@
           const currentVal = parseFloat(sliderEl.value);
           if (currentVal > max) {
             sliderEl.value = max;
-            targetInputEl.value = max;
+            targetInputEl.value = formatTarget(max);
             debouncedRecalc();
           }
         }
@@ -875,7 +904,7 @@
       updateBarSubtitle();
       if (state.lastTarget) {
         sliderEl.value = state.lastTarget;
-        targetInputEl.value = state.lastTarget;
+        targetInputEl.value = formatTarget(state.lastTarget);
       }
       renderWarmups();
       renderPlateToggles();

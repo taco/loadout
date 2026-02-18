@@ -170,22 +170,23 @@ test('calculate: first set deltaType is "load"', () => {
   assert.equal(result.sets[0].deltaType, 'load');
 });
 
-test('calculate: subsequent sets deltaType is "add"', () => {
+test('calculate: subsequent sets deltaType is "add" or "swap"', () => {
   const result = calculate(45, 225, [50, 75], STANDARD);
   assert.ok(!result.error);
-  for (let i = 1; i < result.sets.length; i++) {
-    assert.equal(result.sets[i].deltaType, 'add');
-  }
+  assert.equal(result.sets[0].deltaType, 'load');
+  assert.equal(result.sets[1].deltaType, 'add');
+  assert.equal(result.sets[2].deltaType, 'swap');
 });
 
-test('calculate: deltas equal plates added from previous set', () => {
+test('calculate: deltas equal plates changed from previous set', () => {
   const result = calculate(45, 225, [50, 75], STANDARD);
   assert.ok(!result.error);
   let prevTotal = 0;
   for (const set of result.sets) {
     const deltaTotal = set.delta.reduce((s, p) => s + p, 0);
+    const removeTotal = (set.removeDelta || []).reduce((s, p) => s + p, 0);
     const curTotal = set.plates.reduce((s, p) => s + p, 0);
-    assert.equal(curTotal, prevTotal + deltaTotal, `delta should account for all added weight at set "${set.label}"`);
+    assert.equal(curTotal, prevTotal + deltaTotal - removeTotal, `delta should account for all weight changes at set "${set.label}"`);
     prevTotal = curTotal;
   }
 });
@@ -226,7 +227,7 @@ test('calculate: warmup labeled by target pct even when actual is far off', () =
   assert.ok(!result.error);
   assert.equal(result.sets.length, 3);
   assert.equal(result.sets[1].label, 'Warmup 75%');
-  assert.equal(result.sets[1].actual, 135);
+  assert.equal(result.sets[1].actual, 155);
 });
 
 test('calculate: all warmups always present (sets = warmupPcts.length + 1)', () => {
@@ -257,4 +258,40 @@ test('formatWeight: half-pound prints with 1 decimal', () => {
 
 test('formatWeight: quarter-pound prints with 2 decimals', () => {
   assert.equal(formatWeight(1.25), '1.25');
+});
+
+// --- Extra plate for warmups too far off target ---
+
+test('calculate: bar=20, target=70, warmup=50% — extra plate added', () => {
+  const result = calculate(20, 70, [50], STANDARD);
+  assert.ok(!result.error);
+  assert.equal(result.sets[0].label, 'Warmup 50%');
+  assert.equal(result.sets[0].actual, 30); // bar 20 + 5*2
+  assert.deepEqual(result.sets[0].plates, [5]);
+});
+
+test('calculate: no extra when warmup is within 10pp of target', () => {
+  // 50% of 225: warmup actual=135 (60%), 60 is not < 50-10=40 → no extra
+  const result = calculate(45, 225, [50], STANDARD);
+  assert.ok(!result.error);
+  assert.equal(result.sets[0].actual, 135);
+  assert.deepEqual(result.sets[0].removeDelta, []);
+});
+
+test('calculate: extra does not violate monotonic ordering', () => {
+  // With only 45lb plates, adding 45 extra would equal next set — blocked by strict < cap
+  const only45s = [45];
+  const result = calculate(45, 135, [50], only45s);
+  assert.ok(!result.error);
+  assert.equal(result.sets[0].actual, 45); // still bar only
+  assert.deepEqual(result.sets[0].plates, []);
+});
+
+test('calculate: swap deltaType and removeDelta when extra is dropped', () => {
+  const result = calculate(20, 70, [50], STANDARD);
+  assert.ok(!result.error);
+  const working = result.sets[1];
+  assert.equal(working.deltaType, 'swap');
+  assert.deepEqual(working.removeDelta, [5]);
+  assert.deepEqual(working.delta, [25]);
 });

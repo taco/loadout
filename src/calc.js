@@ -57,7 +57,7 @@ export function bestSubsetForTarget(workingPlates, targetPerSide, withinMask) {
 export function calculate(barWeight, targetWeight, warmupPcts, available) {
   if (targetWeight < barWeight) return { error: 'Target must be at least bar weight' };
   if (targetWeight === barWeight) {
-    return { sets: [{ label: 'Working', pct: 100, target: barWeight, actual: barWeight, plates: [], delta: [], deltaType: 'load' }] };
+    return { sets: [{ label: 'Working', pct: 100, target: barWeight, actual: barWeight, plates: [], delta: [], deltaType: 'load', removeDelta: [] }] };
   }
 
   const workingPerSide = (targetWeight - barWeight) / 2;
@@ -79,17 +79,61 @@ export function calculate(barWeight, targetWeight, warmupPcts, available) {
     constraintMask = warmupMasks[i];
   }
 
+  // Add extra plate for warmups too far off target (>10pp too light)
+  const warmupExtras = new Array(sortedPcts.length).fill(null);
+  for (let i = 0; i < sortedPcts.length; i++) {
+    const perSide = subsetWeight(workingPlates, warmupMasks[i]);
+    const actual = barWeight + perSide * 2;
+    const actualPct = actual / targetWeight * 100;
+    const targetPct = sortedPcts[i];
+    if (actualPct < targetPct - 10) {
+      const nextPerSide = (i < sortedPcts.length - 1)
+        ? subsetWeight(workingPlates, warmupMasks[i + 1])
+        : workingActual;
+      const sortedAvail = [...available].sort((a, b) => a - b);
+      let bestExtra = null;
+      let bestDiff = Infinity;
+      for (const plate of sortedAvail) {
+        if (perSide + plate >= nextPerSide) continue;
+        const newActual = barWeight + (perSide + plate) * 2;
+        const newPct = newActual / targetWeight * 100;
+        const diff = Math.abs(newPct - targetPct);
+        if (diff <= 10) {
+          bestExtra = plate;
+          break;
+        }
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          bestExtra = plate;
+        }
+      }
+      if (bestExtra !== null) {
+        warmupExtras[i] = bestExtra;
+      }
+    }
+  }
+
   const sets = [];
   let prevMask = 0;
+  let prevExtra = null;
 
   for (let i = 0; i < sortedPcts.length; i++) {
     const mask = warmupMasks[i];
-    const plates = subsetPlates(workingPlates, mask);
+    const extra = warmupExtras[i];
     const perSide = subsetWeight(workingPlates, mask);
-    const actual = barWeight + perSide * 2;
+    const extraWeight = extra || 0;
+    const actual = barWeight + (perSide + extraWeight) * 2;
+
+    const basePlates = subsetPlates(workingPlates, mask);
+    const plates = extra ? [...basePlates, extra] : [...basePlates];
 
     const addedMask = mask & ~prevMask;
     const addedPlates = subsetPlates(workingPlates, addedMask);
+    const delta = [...addedPlates];
+    if (extra && extra !== prevExtra) delta.push(extra);
+
+    const removeDelta = (prevExtra && prevExtra !== extra) ? [prevExtra] : [];
+    const deltaType = removeDelta.length > 0 ? 'swap' : (prevMask === 0 && prevExtra === null ? 'load' : 'add');
 
     sets.push({
       label: 'Warmup ' + sortedPcts[i] + '%',
@@ -97,16 +141,19 @@ export function calculate(barWeight, targetWeight, warmupPcts, available) {
       target: Math.round(targetWeight * sortedPcts[i] / 100),
       actual,
       plates: plates.sort((a, b) => b - a),
-      delta: addedPlates.sort((a, b) => b - a),
-      deltaType: prevMask === 0 ? 'load' : 'add'
+      delta: delta.sort((a, b) => b - a),
+      deltaType,
+      removeDelta
     });
     prevMask = mask;
+    prevExtra = extra;
   }
 
   const workPlatesSorted = workingPlates.sort((a, b) => b - a);
   const workActual = barWeight + workingActual * 2;
   const addedMask = workingMask & ~prevMask;
   const addedPlates = subsetPlates(workingPlates, addedMask);
+  const removeDelta = prevExtra ? [prevExtra] : [];
 
   sets.push({
     label: 'Working',
@@ -115,7 +162,8 @@ export function calculate(barWeight, targetWeight, warmupPcts, available) {
     actual: workActual,
     plates: workPlatesSorted,
     delta: addedPlates.sort((a, b) => b - a),
-    deltaType: prevMask === 0 ? 'load' : 'add'
+    deltaType: removeDelta.length > 0 ? 'swap' : (prevMask === 0 && prevExtra === null ? 'load' : 'add'),
+    removeDelta
   });
 
   return { sets };
