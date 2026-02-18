@@ -1,6 +1,4 @@
 dist/
 node_modules/
 .playwright-mcp/
-*.png
-*.jpg
-*.jpeg
+.DS_Store

@@ -1,11 +1,13 @@
 {
   "name": "loadout",
+  "description": "Barbell plate calculator — warmup sets, plate-by-plate loading instructions, single-file deploy",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "node --test",
     "build": "node build.js",
-    "dev": "vite --host 0.0.0.0"
+    "dev": "vite --host 0.0.0.0",
+    "gen-icons": "node gen-icon.js"
   },
   "devDependencies": {
     "vite": "^7.3.1"
