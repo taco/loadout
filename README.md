@@ -1,6 +1,6 @@
 # Loadout
 
-**[Try it live](http://loadout-app.s3-website-us-east-1.amazonaws.com/)**
+**[Try it live](https://taco.github.io/loadout/)**
 
 Barbell plate calculator — a mobile-first web app that turns a target weight into a set-by-set loading plan with warmups, plate-by-plate delta instructions, and visual plate diagrams.
 
@@ -8,7 +8,7 @@ Barbell plate calculator — a mobile-first web app that turns a target weight i
 
 This project is a playground for shipping a real, useful tool under tight constraints:
 
-- **Single-file deploy.** The build produces one self-contained HTML file (no external JS/CSS/images) uploaded straight to S3. The custom `build.js` strips ES module exports from the calc module and inlines everything — HTML, CSS, JS, even the favicon — into a single `dist/index.html`.
+- **Single-file deploy.** The build produces one self-contained HTML file (no external JS/CSS/images) deployed to GitHub Pages. The custom `build.js` strips ES module exports from the calc module and inlines everything — HTML, CSS, JS, even the favicon — into a single `dist/index.html`.
 - **Pure logic / UI separation.** All calculation lives in `src/calc.js` with zero DOM dependencies, fully exported and unit-tested. The UI in `src/index.html` consumes it as an ES module. This makes the math easy to test and reason about independently.
 - **Bitmask subset-sum for warmup selection.** Warmup sets pick the best subset of the working-set plates (not an independent greedy solve) so every warmup is a strict subset you build toward. The solver enumerates subsets via bitmask arithmetic — compact, O(2^n) over a small plate array, no recursion.
 - **Zero runtime dependencies.** One dev dependency (Vite, for HMR during development). Icons are hand-rolled PNGs generated from pixel data using only `node:zlib` — no canvas, no Sharp, no image library.
@@ -33,4 +33,4 @@ pnpm gen-icons   # regenerate favicon + apple-touch-icon PNGs
 
 ## Deploy
 
-CI runs tests, builds, and uploads `dist/index.html` to S3 on push to `main`.
+CI runs tests, builds, and deploys `dist/index.html` to GitHub Pages on push to `main`.
