@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, user-scalable=no"
+      content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta
@@ -55,6 +55,7 @@
         justify-content: space-between;
         align-items: center;
         padding: 10px 16px;
+        padding-top: calc(10px + env(safe-area-inset-top));
         border-bottom: 1px solid var(--card-border);
       }
       .header-title {
@@ -130,7 +131,7 @@
       }
 
       #results {
-        padding: 0 20px 130px;
+        padding: 10px 10px 130px;
         display: flex;
         flex-direction: column;
         gap: 8px;
@@ -489,8 +490,21 @@
     <div class="inputs">
       <div class="input-row">
         <label for="targetSlider">Target</label>
-        <input type="range" id="targetSlider" min="45" max="250" step="2.5" value="225" />
-        <input type="text" id="targetInput" inputmode="decimal" class="target-override" placeholder="225" />
+        <input
+          type="range"
+          id="targetSlider"
+          min="45"
+          max="250"
+          step="2.5"
+          value="225"
+        />
+        <input
+          type="text"
+          id="targetInput"
+          inputmode="decimal"
+          class="target-override"
+          placeholder="225"
+        />
         <span class="unit">lb</span>
       </div>
     </div>
