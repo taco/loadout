@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -23,4 +23,6 @@ const result = html.replace(
 
 mkdirSync(distDir, { recursive: true });
 writeFileSync(resolve(distDir, 'index.html'), result);
+copyFileSync(resolve(srcDir, 'apple-touch-icon.png'), resolve(distDir, 'apple-touch-icon.png'));
+copyFileSync(resolve(srcDir, 'favicon.png'), resolve(distDir, 'favicon.png'));
 console.log('Built dist/index.html');
