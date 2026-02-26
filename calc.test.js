@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { greedyPlates, calculate, formatWeight } from './src/calc.js';
+import { greedyPlates, multisetDiff, calculate, formatWeight } from './src/calc.js';
 
 const STANDARD = [1.25, 2.5, 5, 10, 25, 45];
 
@@ -49,13 +49,52 @@ test('greedyPlates: no 45s, 90 per side → [25, 25, 25, 10, 5]', () => {
   assert.equal(actual, 90);
 });
 
+// --- multisetDiff ---
+
+test('multisetDiff: empty → [45, 25] adds both', () => {
+  const { added, removed } = multisetDiff([], [45, 25]);
+  assert.deepEqual(added, [45, 25]);
+  assert.deepEqual(removed, []);
+});
+
+test('multisetDiff: [25, 10] → [45, 10, 5] adds 45,5 removes 25', () => {
+  const { added, removed } = multisetDiff([25, 10], [45, 10, 5]);
+  assert.deepEqual(added, [45, 5]);
+  assert.deepEqual(removed, [25]);
+});
+
+test('multisetDiff: identical arrays → no changes', () => {
+  const { added, removed } = multisetDiff([45, 10], [45, 10]);
+  assert.deepEqual(added, []);
+  assert.deepEqual(removed, []);
+});
+
+test('multisetDiff: [45] → [45, 45] adds one 45', () => {
+  const { added, removed } = multisetDiff([45], [45, 45]);
+  assert.deepEqual(added, [45]);
+  assert.deepEqual(removed, []);
+});
+
+test('multisetDiff: [45, 10] → [] removes both', () => {
+  const { added, removed } = multisetDiff([45, 10], []);
+  assert.deepEqual(added, []);
+  assert.deepEqual(removed, [45, 10]);
+});
+
 // --- calculate: full pipeline ---
 
 test('calculate: bar=45, target=225, warmups=[50,75]', () => {
   const result = calculate(45, 225, [50, 75], STANDARD);
   assert.ok(!result.error, result.error);
-  // Both warmups shown even when actual % differs from target %
   assert.equal(result.sets.length, 3);
+
+  const w50 = result.sets[0];
+  assert.equal(w50.label, 'Warmup 50%');
+  assert.equal(w50.actual, 115); // 35 per side → [25, 10]
+
+  const w75 = result.sets[1];
+  assert.equal(w75.label, 'Warmup 75%');
+  assert.equal(w75.actual, 165); // 60 per side → [45, 10, 5]
 
   const working = result.sets[2];
   assert.equal(working.label, 'Working');
@@ -63,14 +102,12 @@ test('calculate: bar=45, target=225, warmups=[50,75]', () => {
   assert.deepEqual(working.plates, [45, 45]);
 });
 
-test('calculate: bar=45, target=225 — all sets monotonically nested', () => {
+test('calculate: bar=45, target=225 — all sets monotonically increasing', () => {
   const result = calculate(45, 225, [50, 75], STANDARD);
   assert.ok(!result.error);
-  // Each set's plate count should be <= next set's plate count
   for (let i = 0; i < result.sets.length - 1; i++) {
-    const cur = result.sets[i].plates.reduce((s, p) => s + p, 0);
-    const next = result.sets[i + 1].plates.reduce((s, p) => s + p, 0);
-    assert.ok(cur <= next, `set ${i} (${cur}) should be <= set ${i+1} (${next})`);
+    assert.ok(result.sets[i].actual <= result.sets[i + 1].actual,
+      `set ${i} (${result.sets[i].actual}) should be <= set ${i+1} (${result.sets[i + 1].actual})`);
   }
 });
 
@@ -111,19 +148,8 @@ test('calculate: 225 with warmups — two 45s are not zeroed out', () => {
   const result = calculate(45, 225, [50, 75], STANDARD);
   assert.ok(!result.error);
   const working = result.sets[result.sets.length - 1];
-  // Both 45s should be present
   const count45 = working.plates.filter(p => p === 45).length;
   assert.equal(count45, 2, 'working set should have two 45-lb plates per side');
-});
-
-test('calculate: every warmup plates are a subset (by weight total) of the next heavier set', () => {
-  const result = calculate(45, 225, [50, 75], STANDARD);
-  assert.ok(!result.error);
-  for (let i = 0; i < result.sets.length - 1; i++) {
-    const curTotal = result.sets[i].plates.reduce((s, p) => s + p, 0);
-    const nextTotal = result.sets[i + 1].plates.reduce((s, p) => s + p, 0);
-    assert.ok(curTotal <= nextTotal, `set ${i} total ${curTotal} should be <= set ${i+1} total ${nextTotal}`);
-  }
 });
 
 // --- Inexact weight handling ---
@@ -170,14 +196,6 @@ test('calculate: first set deltaType is "load"', () => {
   assert.equal(result.sets[0].deltaType, 'load');
 });
 
-test('calculate: subsequent sets deltaType is "add" or "swap"', () => {
-  const result = calculate(45, 225, [50, 75], STANDARD);
-  assert.ok(!result.error);
-  assert.equal(result.sets[0].deltaType, 'load');
-  assert.equal(result.sets[1].deltaType, 'add');
-  assert.equal(result.sets[2].deltaType, 'swap');
-});
-
 test('calculate: deltas equal plates changed from previous set', () => {
   const result = calculate(45, 225, [50, 75], STANDARD);
   assert.ok(!result.error);
@@ -191,18 +209,24 @@ test('calculate: deltas equal plates changed from previous set', () => {
   }
 });
 
-// --- Warmup ±10% boundary ---
+// --- Warmup presence ---
 
-test('calculate: warmup within 10% of target pct is included', () => {
-  // 50% of 225 = 112.5lb, closest = 115lb = 51.1% → within ±10%
-  const result = calculate(45, 225, [50], STANDARD);
+test('calculate: all warmups always present (sets = warmupPcts.length + 1)', () => {
+  const result = calculate(45, 225, [50, 75], STANDARD);
   assert.ok(!result.error);
-  assert.equal(result.sets.length, 2); // warmup + working
-  assert.equal(result.sets[0].label, 'Warmup 50%');
+  assert.equal(result.sets.length, 3);
+
+  const r2 = calculate(45, 225, [50], STANDARD);
+  assert.ok(!r2.error);
+  assert.equal(r2.sets.length, 2);
+
+  const only45s = [45];
+  const r3 = calculate(45, 135, [50], only45s);
+  assert.ok(!r3.error);
+  assert.equal(r3.sets.length, 2);
 });
 
 test('calculate: warmup far from target is still shown', () => {
-  // Only 45s: 50% warmup of 135 → bar only (45lb actual), still shown
   const only45s = [45];
   const result = calculate(45, 135, [50], only45s);
   assert.ok(!result.error);
@@ -212,37 +236,66 @@ test('calculate: warmup far from target is still shown', () => {
   assert.deepEqual(result.sets[0].plates, []);
 });
 
-test('calculate: bar=20, target=90, warmup=50% — within bounds, included', () => {
-  // 50% of 90 = 45lb, actual = 40lb → 44.4% → within ±10%
+// --- Warmup accuracy (independent greedy) ---
+
+test('calculate: bar=45, target=225 — warmups are within 5% of target pct', () => {
+  const result = calculate(45, 225, [50, 75], STANDARD);
+  assert.ok(!result.error);
+  const w50 = result.sets[0];
+  const w75 = result.sets[1];
+  const actualPct50 = w50.actual / 225 * 100;
+  const actualPct75 = w75.actual / 225 * 100;
+  assert.ok(Math.abs(actualPct50 - 50) < 5, `50% warmup actual ${actualPct50.toFixed(1)}% should be within 5pp of 50%`);
+  assert.ok(Math.abs(actualPct75 - 75) < 5, `75% warmup actual ${actualPct75.toFixed(1)}% should be within 5pp of 75%`);
+});
+
+test('calculate: warmup never uses 1.25 plates', () => {
+  const result = calculate(45, 225, [50, 75], STANDARD);
+  assert.ok(!result.error);
+  for (let i = 0; i < result.sets.length - 1; i++) {
+    const has125 = result.sets[i].plates.some(p => Math.abs(p - 1.25) < 0.001);
+    assert.ok(!has125, `warmup set ${i} should not use 1.25 plates`);
+  }
+});
+
+test('calculate: bar=20, target=90, warmup=50%', () => {
+  // rawPerSide = (45-20)/2 = 12.5, <15 → round to nearest 2.5 = 12.5
+  // greedyPlates(12.5, no1.25) → [10, 2.5] = 12.5 → actual = 20+25 = 45
   const result = calculate(20, 90, [50], STANDARD);
   assert.ok(!result.error);
   assert.equal(result.sets.length, 2);
   assert.equal(result.sets[0].label, 'Warmup 50%');
-  assert.equal(result.sets[0].actual, 40);
+  assert.equal(result.sets[0].actual, 45);
 });
 
-test('calculate: warmup labeled by target pct even when actual is far off', () => {
-  // 75% of 225 → actual 135 (60%), still labeled "Warmup 75%"
-  const result = calculate(45, 225, [50, 75], STANDARD);
+test('calculate: bar=20, target=70, warmup=50%', () => {
+  // rawPerSide = (35-20)/2 = 7.5, <15 → round to nearest 2.5 = 7.5
+  // greedyPlates(7.5, no1.25) → [5, 2.5] = 7.5 → actual = 20+15 = 35
+  const result = calculate(20, 70, [50], STANDARD);
   assert.ok(!result.error);
-  assert.equal(result.sets.length, 3);
-  assert.equal(result.sets[1].label, 'Warmup 75%');
-  assert.equal(result.sets[1].actual, 155);
+  assert.equal(result.sets[0].label, 'Warmup 50%');
+  assert.equal(result.sets[0].actual, 35);
+  assert.deepEqual(result.sets[0].plates, [5, 2.5]);
 });
 
-test('calculate: all warmups always present (sets = warmupPcts.length + 1)', () => {
-  const result = calculate(45, 225, [50, 75], STANDARD);
+// --- Warmup rounding ---
+
+test('calculate: warmup per-side >= 15 rounds to nearest 5', () => {
+  // bar=45, target=225, 75%: rawPerSide=61.875 → rounds to 60
+  const result = calculate(45, 225, [75], STANDARD);
   assert.ok(!result.error);
-  assert.equal(result.sets.length, 3); // 2 warmups + working
+  const w = result.sets[0];
+  const perSide = (w.actual - 45) / 2;
+  assert.equal(perSide % 5, 0, `per-side weight ${perSide} should be divisible by 5`);
+});
 
-  const r2 = calculate(45, 225, [50], STANDARD);
-  assert.ok(!r2.error);
-  assert.equal(r2.sets.length, 2); // 1 warmup + working
-
-  const only45s = [45];
-  const r3 = calculate(45, 135, [50], only45s);
-  assert.ok(!r3.error);
-  assert.equal(r3.sets.length, 2); // bar-only warmup still shown
+test('calculate: warmup per-side < 15 rounds to nearest 2.5', () => {
+  // bar=20, target=90, 50%: rawPerSide=12.5 → rounds to 12.5
+  const result = calculate(20, 90, [50], STANDARD);
+  assert.ok(!result.error);
+  const w = result.sets[0];
+  const perSide = (w.actual - 20) / 2;
+  assert.equal(perSide % 2.5, 0, `per-side weight ${perSide} should be divisible by 2.5`);
 });
 
 // --- formatWeight ---
@@ -258,40 +311,4 @@ test('formatWeight: half-pound prints with 1 decimal', () => {
 
 test('formatWeight: quarter-pound prints with 2 decimals', () => {
   assert.equal(formatWeight(1.25), '1.25');
-});
-
-// --- Extra plate for warmups too far off target ---
-
-test('calculate: bar=20, target=70, warmup=50% — extra plate added', () => {
-  const result = calculate(20, 70, [50], STANDARD);
-  assert.ok(!result.error);
-  assert.equal(result.sets[0].label, 'Warmup 50%');
-  assert.equal(result.sets[0].actual, 30); // bar 20 + 5*2
-  assert.deepEqual(result.sets[0].plates, [5]);
-});
-
-test('calculate: no extra when warmup is within 10pp of target', () => {
-  // 50% of 225: warmup actual=135 (60%), 60 is not < 50-10=40 → no extra
-  const result = calculate(45, 225, [50], STANDARD);
-  assert.ok(!result.error);
-  assert.equal(result.sets[0].actual, 135);
-  assert.deepEqual(result.sets[0].removeDelta, []);
-});
-
-test('calculate: extra does not violate monotonic ordering', () => {
-  // With only 45lb plates, adding 45 extra would equal next set — blocked by strict < cap
-  const only45s = [45];
-  const result = calculate(45, 135, [50], only45s);
-  assert.ok(!result.error);
-  assert.equal(result.sets[0].actual, 45); // still bar only
-  assert.deepEqual(result.sets[0].plates, []);
-});
-
-test('calculate: swap deltaType and removeDelta when extra is dropped', () => {
-  const result = calculate(20, 70, [50], STANDARD);
-  assert.ok(!result.error);
-  const working = result.sets[1];
-  assert.equal(working.deltaType, 'swap');
-  assert.deepEqual(working.removeDelta, [5]);
-  assert.deepEqual(working.delta, [25]);
 });

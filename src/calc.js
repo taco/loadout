@@ -20,38 +20,30 @@ export function greedyPlates(weightPerSide, available) {
   return { plates, actual };
 }
 
-export function subsetWeight(plates, mask) {
-  let w = 0;
-  for (let i = 0; i < plates.length; i++) {
-    if (mask & (1 << i)) w += plates[i];
-  }
-  return w;
-}
+export function multisetDiff(prev, next) {
+  const prevCounts = new Map();
+  for (const p of prev) prevCounts.set(p, (prevCounts.get(p) || 0) + 1);
+  const nextCounts = new Map();
+  for (const p of next) nextCounts.set(p, (nextCounts.get(p) || 0) + 1);
 
-export function subsetPlates(plates, mask) {
-  const result = [];
-  for (let i = 0; i < plates.length; i++) {
-    if (mask & (1 << i)) result.push(plates[i]);
-  }
-  return result;
-}
+  const added = [];
+  const removed = [];
 
-export function bestSubsetForTarget(workingPlates, targetPerSide, withinMask) {
-  let bestMask = 0;
-  let bestDiff = Infinity;
-
-  let mask = withinMask;
-  while (true) {
-    const w = subsetWeight(workingPlates, mask);
-    const diff = Math.abs(w - targetPerSide);
-    if (diff < bestDiff || (diff === bestDiff && w <= targetPerSide)) {
-      bestDiff = diff;
-      bestMask = mask;
+  const allKeys = new Set([...prevCounts.keys(), ...nextCounts.keys()]);
+  for (const key of allKeys) {
+    const pCount = prevCounts.get(key) || 0;
+    const nCount = nextCounts.get(key) || 0;
+    const diff = nCount - pCount;
+    if (diff > 0) {
+      for (let i = 0; i < diff; i++) added.push(key);
+    } else if (diff < 0) {
+      for (let i = 0; i < -diff; i++) removed.push(key);
     }
-    if (mask === 0) break;
-    mask = (mask - 1) & withinMask;
   }
-  return bestMask;
+
+  added.sort((a, b) => b - a);
+  removed.sort((a, b) => b - a);
+  return { added, removed };
 }
 
 export function calculate(barWeight, targetWeight, warmupPcts, available) {
@@ -63,97 +55,72 @@ export function calculate(barWeight, targetWeight, warmupPcts, available) {
   const workingPerSide = (targetWeight - barWeight) / 2;
   const { plates: workingPlates } = greedyPlates(workingPerSide, available);
   const workingActual = workingPlates.reduce((s, p) => s + p, 0);
-  const workingMask = (1 << workingPlates.length) - 1;
 
   const sortedPcts = [...warmupPcts].sort((a, b) => a - b);
 
-  const warmupMasks = new Array(sortedPcts.length);
-  let constraintMask = workingMask;
-  for (let i = sortedPcts.length - 1; i >= 0; i--) {
-    const warmupTarget = (targetWeight * sortedPcts[i] / 100 - barWeight) / 2;
-    if (warmupTarget <= 0) {
-      warmupMasks[i] = 0;
-    } else {
-      warmupMasks[i] = bestSubsetForTarget(workingPlates, warmupTarget, constraintMask);
-    }
-    constraintMask = warmupMasks[i];
-  }
-
-  // Add extra plate for warmups too far off target (>10pp too light)
-  const warmupExtras = new Array(sortedPcts.length).fill(null);
-  for (let i = 0; i < sortedPcts.length; i++) {
-    const perSide = subsetWeight(workingPlates, warmupMasks[i]);
-    const actual = barWeight + perSide * 2;
-    const actualPct = actual / targetWeight * 100;
-    const targetPct = sortedPcts[i];
-    if (actualPct < targetPct - 10) {
-      const nextPerSide = (i < sortedPcts.length - 1)
-        ? subsetWeight(workingPlates, warmupMasks[i + 1])
-        : workingActual;
-      const sortedAvail = [...available].sort((a, b) => a - b);
-      let bestExtra = null;
-      let bestDiff = Infinity;
-      for (const plate of sortedAvail) {
-        if (perSide + plate >= nextPerSide) continue;
-        const newActual = barWeight + (perSide + plate) * 2;
-        const newPct = newActual / targetWeight * 100;
-        const diff = Math.abs(newPct - targetPct);
-        if (diff <= 10) {
-          bestExtra = plate;
-          break;
-        }
-        if (diff < bestDiff) {
-          bestDiff = diff;
-          bestExtra = plate;
-        }
-      }
-      if (bestExtra !== null) {
-        warmupExtras[i] = bestExtra;
-      }
-    }
-  }
+  // Filter out 1.25 plates for warmups
+  const warmupAvailable = available.filter(p => Math.abs(p - 1.25) > 0.001);
 
   const sets = [];
-  let prevMask = 0;
-  let prevExtra = null;
+  let prevPlates = [];
 
-  for (let i = 0; i < sortedPcts.length; i++) {
-    const mask = warmupMasks[i];
-    const extra = warmupExtras[i];
-    const perSide = subsetWeight(workingPlates, mask);
-    const extraWeight = extra || 0;
-    const actual = barWeight + (perSide + extraWeight) * 2;
+  for (const pct of sortedPcts) {
+    const rawPerSide = (targetWeight * pct / 100 - barWeight) / 2;
 
-    const basePlates = subsetPlates(workingPlates, mask);
-    const plates = extra ? [...basePlates, extra] : [...basePlates];
+    let roundedPerSide;
+    if (rawPerSide <= 0) {
+      roundedPerSide = 0;
+    } else if (rawPerSide < 15) {
+      roundedPerSide = Math.round(rawPerSide / 2.5) * 2.5;
+    } else {
+      roundedPerSide = Math.round(rawPerSide / 5) * 5;
+    }
 
-    const addedMask = mask & ~prevMask;
-    const addedPlates = subsetPlates(workingPlates, addedMask);
-    const delta = [...addedPlates];
-    if (extra && extra !== prevExtra) delta.push(extra);
+    const { plates } = roundedPerSide > 0
+      ? greedyPlates(roundedPerSide, warmupAvailable)
+      : { plates: [] };
 
-    const removeDelta = (prevExtra && prevExtra !== extra) ? [prevExtra] : [];
-    const deltaType = removeDelta.length > 0 ? 'swap' : (prevMask === 0 && prevExtra === null ? 'load' : 'add');
+    const perSideActual = plates.reduce((s, p) => s + p, 0);
+    const actual = barWeight + perSideActual * 2;
+
+    const { added, removed } = multisetDiff(prevPlates, plates);
+    let deltaType;
+    if (prevPlates.length === 0) {
+      deltaType = plates.length === 0 ? 'load' : 'load';
+    } else if (removed.length > 0) {
+      deltaType = 'swap';
+    } else {
+      deltaType = 'add';
+    }
 
     sets.push({
-      label: 'Warmup ' + sortedPcts[i] + '%',
-      pct: sortedPcts[i],
-      target: Math.round(targetWeight * sortedPcts[i] / 100),
+      label: 'Warmup ' + pct + '%',
+      pct,
+      target: Math.round(targetWeight * pct / 100),
       actual,
-      plates: plates.sort((a, b) => b - a),
-      delta: delta.sort((a, b) => b - a),
+      plates: [...plates].sort((a, b) => b - a),
+      delta: added,
       deltaType,
-      removeDelta
+      removeDelta: removed
     });
-    prevMask = mask;
-    prevExtra = extra;
+    prevPlates = plates;
   }
 
-  const workPlatesSorted = workingPlates.sort((a, b) => b - a);
+  // Working set
+  const workPlatesSorted = [...workingPlates].sort((a, b) => b - a);
   const workActual = barWeight + workingActual * 2;
-  const addedMask = workingMask & ~prevMask;
-  const addedPlates = subsetPlates(workingPlates, addedMask);
-  const removeDelta = prevExtra ? [prevExtra] : [];
+  const { added, removed } = multisetDiff(prevPlates, workingPlates);
+
+  let workingDeltaType;
+  if (prevPlates.length === 0 && sortedPcts.length === 0) {
+    workingDeltaType = 'load';
+  } else if (prevPlates.length === 0) {
+    workingDeltaType = 'load';
+  } else if (removed.length > 0) {
+    workingDeltaType = 'swap';
+  } else {
+    workingDeltaType = 'add';
+  }
 
   sets.push({
     label: 'Working',
@@ -161,9 +128,9 @@ export function calculate(barWeight, targetWeight, warmupPcts, available) {
     target: targetWeight,
     actual: workActual,
     plates: workPlatesSorted,
-    delta: addedPlates.sort((a, b) => b - a),
-    deltaType: removeDelta.length > 0 ? 'swap' : (prevMask === 0 && prevExtra === null ? 'load' : 'add'),
-    removeDelta
+    delta: added,
+    deltaType: workingDeltaType,
+    removeDelta: removed
   });
 
   return { sets };
